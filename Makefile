@@ -1,7 +1,7 @@
 .PHONY: build run
 
 build:
-	docker build -t skiskill .
+	docker build -t kksk .
 
 run:
-	docker run -it --rm -v $(CURDIR):/app -e SESSION=$(SESSION) -e PART=$(PART) skiskill
+	docker run -it --rm -v $(CURDIR):/app -e SESSION=$(SESSION) -e PART=$(PART) kksk
