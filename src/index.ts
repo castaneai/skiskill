@@ -66,22 +66,14 @@ if (!session) {
 }
 
 let browser: Browser;
-(async() => {
-    const executablePath =
-        process.platform === "darwin"
-            ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-            : "google-chrome-unstable";
-    browser = await puppeteer.launch({
-        headless: false,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-        executablePath
-    });
-})();
+const executablePath =
+    process.platform === "darwin"
+        ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        : "google-chrome-unstable";
 
 const app = express();
 
 app.get('/', async (req: express.Request, res: express.Response) => {
-    console.dir(req.query);
     const partId = req.query.partId?.toString();
     if (!partId) {
         console.error('query param: partId not found');
@@ -96,6 +88,15 @@ app.get('/', async (req: express.Request, res: express.Response) => {
     }
     const outPath = '/tmp/out.png';
     console.log(`start capture partId: ${partId}, second: ${second}`);
+
+    if (!browser) {
+        browser = await puppeteer.launch({
+            headless: false,
+            args: ["--no-sandbox", "--disable-setuid-sandbox"],
+            executablePath
+        });
+    }
+
     await capture(browser, outPath, {session: session, partId: partId, second: second});
     res.sendFile(outPath);
 });

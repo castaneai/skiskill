@@ -1,3 +1,8 @@
+FROM node:10-alpine AS builder
+WORKDIR /build
+COPY . .
+RUN npm install && npm run build
+
 # Based on https://github.com/nsourov/Puppeteer-with-xvfb
 FROM node:10
 
@@ -23,10 +28,11 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 
 WORKDIR /app
 
-COPY package.json /app
+COPY package*.json /app/
+COPY entrypoint.sh /app/
 
-RUN npm install
-COPY . /app
+RUN npm install --production --cache /tmp/cache && rm -rf /tmp/cache
+COPY --from=builder /build/dist ./dist/
 
 ENV DISPLAY :99
 
