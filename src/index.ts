@@ -1,4 +1,5 @@
-import puppeteer from "puppeteer";
+import express from "express";
+import puppeteer, { Browser } from "puppeteer";
 
 type Second = number;
 
@@ -33,54 +34,73 @@ const seekVideo = async (page: puppeteer.Page, to: Second) => {
     await page.waitFor(step * 1000);
 };
 
-(async () => {
-    const session = process.env.SESSION;
-    if (!session) {
-        console.error("env: SESSION not set");
-        return;
-    }
+interface CaptureParams {
+    session: string;
+    partId: string;
+    second: Second;
+}
 
-    const partId = process.env.PART;
-    if (!partId) {
-        console.error("env: PART not set");
-        return;
-    }
-    console.log(`partId: ${partId}`);
-
-    const captureSec = parseInt(process.argv[2]);
-    if (isNaN(captureSec)) {
-        console.error("Usage: kksk [captureSec]");
-        return;
-    }
-    console.log(`capture sec: ${captureSec}`);
-
-    const executablePath =
-        process.platform === "darwin"
-            ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-            : "google-chrome-unstable";
-    console.log(`executable: ${executablePath}`);
-    const browser = await puppeteer.launch({
-        headless: false,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-        executablePath
-    });
+const capture = async (browser: puppeteer.Browser, outPath: string, params: CaptureParams) => {
     const page = await browser.newPage();
     await page.setCookie({
         name: "certificate_session_id",
-        value: session,
+        value: params.session,
         domain: "anime.dmkt-sp.jp"
     });
-    const url = `https://anime.dmkt-sp.jp/animestore/sc_d_pc?partId=${partId}`;
+    const url = `https://anime.dmkt-sp.jp/animestore/sc_d_pc?partId=${params.partId}`;
     await page.goto(url);
     await page.waitFor(1000);
 
     const videoSize = await page.evaluate(initializePlayer);
     await page.setViewport(videoSize);
 
-    // do capture
-    await seekVideo(page, captureSec);
-    await page.screenshot({ path: `out/${partId}_${captureSec}.png` });
+    await seekVideo(page, params.second);
+    await page.screenshot({ path: outPath });
     await page.evaluate(() => window.vc.videoEl.pause());
+    await page.close();
+}
 
-    await browser.close();
+const session = process.env.SESSION;
+if (!session) {
+    throw 'env: SESSION not defined';
+}
+
+let browser: Browser;
+(async() => {
+    const executablePath =
+        process.platform === "darwin"
+            ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            : "google-chrome-unstable";
+    browser = await puppeteer.launch({
+        headless: false,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        executablePath
+    });
 })();
+
+const app = express();
+
+app.get('/', async (req: express.Request, res: express.Response) => {
+    console.dir(req.query);
+    const partId = req.query.partId?.toString();
+    if (!partId) {
+        console.error('query param: partId not found');
+        res.sendStatus(400);
+        return;
+    }
+    const second = parseInt(req.query.second?.toString() || "");
+    if (isNaN(second)) {
+        console.error('query param: second not found');
+        res.sendStatus(400);
+        return;
+    }
+    const outPath = '/tmp/out.png';
+    console.log(`start capture partId: ${partId}, second: ${second}`);
+    await capture(browser, outPath, {session: session, partId: partId, second: second});
+    res.sendFile(outPath);
+});
+
+const port = process.env.PORT || 8080;
+app.listen(port, () => {
+    console.log('listening on port', port);
+});
