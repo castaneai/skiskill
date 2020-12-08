@@ -1,4 +1,5 @@
 FROM node:10-alpine AS builder
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
 WORKDIR /build
 COPY . .
 RUN npm install && npm run build
