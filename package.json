@@ -19,10 +19,12 @@
   },
   "homepage": "https://github.com/castaneai/kksk#readme",
   "dependencies": {
+    "command-exists": "^1.2.9",
     "express": "^4.17.1",
     "puppeteer": "^2.1.1"
   },
   "devDependencies": {
+    "@types/command-exists": "^1.2.0",
     "@types/express": "^4.17.9",
     "@types/puppeteer": "^2.0.1",
     "typescript": "^3.8.3"

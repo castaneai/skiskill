@@ -1,5 +1,7 @@
 import express from "express";
 import puppeteer, { Browser } from "puppeteer";
+import { sync as commandExistsSync } from 'command-exists';
+import fs from 'fs';
 
 type Second = number;
 
@@ -66,10 +68,6 @@ if (!session) {
 }
 
 let browser: Browser;
-const executablePath =
-    process.platform === "darwin"
-        ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        : "google-chrome-unstable";
 
 const app = express();
 
@@ -90,14 +88,10 @@ app.get('/', async (req: express.Request, res: express.Response) => {
     console.log(`start capture partId: ${partId}, second: ${second}`);
 
     if (!browser) {
-        browser = await puppeteer.launch({
-            headless: false,
-            args: ["--no-sandbox", "--disable-setuid-sandbox"],
-            executablePath
-        });
+        browser = await launchBrowser();
     }
 
-    await capture(browser, outPath, {session: session, partId: partId, second: second});
+    await capture(browser, outPath, { session: session, partId: partId, second: second });
     res.sendFile(outPath);
 });
 
@@ -105,3 +99,29 @@ const port = process.env.PORT || 8080;
 app.listen(port, () => {
     console.log('listening on port', port);
 });
+
+const launchBrowser = async () => {
+    const executablePath = getBrowserExecutable();
+    const args = ['--no-sandbox', '--disable-setuid-sandbox', '--user-agent="Mozilla/5.0 (X11; CrOS armv7l 12371.89.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36"'];
+    return puppeteer.launch({
+        headless: false,
+        args,
+        executablePath,
+    });
+}
+
+const getBrowserExecutable = () => {
+    if (process.platform == 'darwin') {
+        const path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+        if (!fs.existsSync(path)) {
+            throw `chrome not found in ${path}`;
+        }
+    }
+    const ret = ['google-chrome-unstable', 'google-chrome-stable', 'chromium-browser'].find(path => {
+        return commandExistsSync(path);
+    });
+    if (ret) {
+        return ret;
+    }
+    throw `chrome not found`;
+}
