@@ -31,7 +31,7 @@ const seekVideo = async (page: puppeteer.Page, to: Second) => {
     console.log(`key: ${prevKey}, +${step}s`);
     await page.evaluate(s => window.vc.jump(s), prevKey);
     await page.waitFor(500); // wait for UI transition to show loading area
-    await page.waitForFunction(canPlayVideo);
+    await page.waitForFunction(canPlayVideo, { timeout: 5000 });
     await page.evaluate(() => window.vc.videoEl.play());
     await page.waitFor(step * 1000);
 };
@@ -44,22 +44,30 @@ interface CaptureParams {
 
 const capture = async (browser: puppeteer.Browser, outPath: string, params: CaptureParams) => {
     const page = await browser.newPage();
-    await page.setCookie({
-        name: "certificate_session_id",
-        value: params.session,
-        domain: "anime.dmkt-sp.jp"
-    });
-    const url = `https://anime.dmkt-sp.jp/animestore/sc_d_pc?partId=${params.partId}`;
-    await page.goto(url);
-    await page.waitFor(1000);
+    try {
+        await page.setCookie({
+            name: "certificate_session_id",
+            value: params.session,
+            domain: "anime.dmkt-sp.jp"
+        });
+        const url = `https://anime.dmkt-sp.jp/animestore/sc_d_pc?partId=${params.partId}`;
+        await page.goto(url);
+        await page.waitFor(1000);
 
-    const videoSize = await page.evaluate(initializePlayer);
-    await page.setViewport(videoSize);
+        const videoSize = await page.evaluate(initializePlayer);
+        await page.setViewport(videoSize);
 
-    await seekVideo(page, params.second);
-    await page.screenshot({ path: outPath });
-    await page.evaluate(() => window.vc.videoEl.pause());
-    await page.close();
+        await seekVideo(page, params.second);
+        await page.screenshot({ path: outPath });
+        await page.evaluate(() => window.vc.videoEl.pause());
+        return true;
+    } catch (err) {
+        console.error(`error occured while processing in browser: ${err}`);
+        await page.screenshot({ path: outPath });
+        return false;
+    } finally {
+        await page.close();
+    }
 }
 
 const session = process.env.SESSION;
@@ -91,7 +99,10 @@ app.get('/', async (req: express.Request, res: express.Response) => {
         browser = await launchBrowser();
     }
 
-    await capture(browser, outPath, { session: session, partId: partId, second: second });
+    const succeeded = await capture(browser, outPath, { session: session, partId: partId, second: second });
+    if (!succeeded) {
+        res.status(500);
+    }
     res.sendFile(outPath);
 });
 
@@ -111,13 +122,18 @@ const launchBrowser = async () => {
 }
 
 const getBrowserExecutable = () => {
+    // macOS
     if (process.platform == 'darwin') {
         const path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
         if (!fs.existsSync(path)) {
             throw `chrome not found in ${path}`;
         }
+        return path;
     }
+
+    // linux
     const ret = ['google-chrome-unstable', 'google-chrome-stable', 'chromium-browser'].find(path => {
+        console.log(`${path} e`)
         return commandExistsSync(path);
     });
     if (ret) {
