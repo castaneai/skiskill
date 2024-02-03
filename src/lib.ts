@@ -47,7 +47,8 @@ interface CaptureParams {
     second: Second;
 }
 
-export async function capture(context: BrowserContext, outPath: string, params: CaptureParams) {
+export async function capture(context: BrowserContext, outPath: string, params: CaptureParams): Promise<boolean> {
+    if (!params.session) throw new Error('session is missing')
     await context.addCookies([{
         name: "certificate_session_id",
         value: params.session,
@@ -64,8 +65,7 @@ export async function capture(context: BrowserContext, outPath: string, params: 
         await page.locator('#video').screenshot({ path: outPath })
         return true
     } catch (err) {
-        console.error(`error occured while processing in browser: ${err}`)
-        await page.screenshot({ path: outPath });
+        await page.screenshot({ path: outPath, timeout: 5000 });
         return false
     } finally {
         await page.close()
