@@ -11,7 +11,12 @@ const browser = await chromium.launch({
     },
 })
 const context = await browser.newContext()
-if (!await kksk.capture(context, 'example.png', {session: process.env.SESSION, partId: 22863003, second: 284})) {
-    console.error('error occured in capturing')
+try {
+    if (!await kksk.capture(context, 'example.png', {session: process.env.SESSION, partId: 22863003, second: 284})) {
+        console.error('error occured in capturing')
+    }
+    console.log(`captured to ./example.png`)
+} finally {
+    await context.close()
+    await browser.close()
 }
-console.log(`captured to ./example.png`)
