@@ -2,3 +2,8 @@
 .DS_Store
 /out/*.png
 /dist
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+.env
